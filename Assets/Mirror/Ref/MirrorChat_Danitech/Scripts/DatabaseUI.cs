@@ -29,10 +29,58 @@ public class DatabaseUI : MonoBehaviour
     }
 
 
-    private string SendQuery(string queryStr, string tableName)
+    private void SendQuery(string queryStr, string tableName)
     {
-        DataSet dataSet = OnSelectRequest(queryStr, tableName);
-        return dataSet.GetXml().ToString();
+        // 있으면 SELECT관련 함수 호출
+        if (queryStr.Contains("SELECT"))
+        {
+            DataSet dataSet = OnSelectRequest(queryStr,tableName);
+            Text_DBResult.text = DeformatResult(dataSet);
+        }
+        // 없으면 INSERT 혹은 UPDATE관련 쿼리
+        else 
+        {
+            Text_DBResult.text += OnInsertOnUpdateRequest(queryStr) ? "성공\n" : "실패\n";
+        }
+        
+    }
+
+
+    public static bool OnInsertOnUpdateRequest(string query)
+    {
+        try
+        {
+            MySqlCommand sqlCmd = new MySqlCommand();
+            sqlCmd.Connection = _dbConnection;
+            sqlCmd.CommandText = query;
+
+            _dbConnection.Open();
+            sqlCmd.ExecuteNonQuery();
+            _dbConnection.Close();
+
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning(e);
+            return false;
+        }
+    }
+
+    private string DeformatResult(DataSet dataSet)
+    {
+        string resultStr = string.Empty;
+
+        foreach(DataTable table in dataSet.Tables)
+        {
+            foreach(DataRow row in table.Rows)
+            {
+                foreach(DataColumn col in table.Columns)
+                    resultStr += $"{col.ColumnName}: {row[col]}\n";
+            }
+        }
+
+        return resultStr;
     }
 
     public static DataSet OnSelectRequest(string query, string tableName)
@@ -91,17 +139,16 @@ public class DatabaseUI : MonoBehaviour
         if (!_isConnectTestComplete)
         {
             Text_Log.text = "DB가 연결 되지 않았습니다. DB를 먼저 연결해주세요";
+            return;
         }
 
         Text_Log.text = string.Empty;
 
         string query = string.IsNullOrWhiteSpace(Input_Query.text) ? 
-            "SELECT U_Name FROM user_info" :
+            "SELECT U_Name,U_Password FROM user_info " :
             Input_Query.text;
         
-        string resulStr = SendQuery(query, "user_info");
-        
-        Text_DBResult.text = resulStr;
+        SendQuery(query, "user_info");
     }
 
     public void OnClick_OpenDatabaseUI()
